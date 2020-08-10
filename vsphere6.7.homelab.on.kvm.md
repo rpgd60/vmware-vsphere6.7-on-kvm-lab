@@ -472,6 +472,7 @@ This iso, when mounted, provides access to Windows and Linux CLI and GUI install
 - Summary - ready to complete stage 1
 
   <img src="vsphere6.7.homelab.on.kvm.assets/image-20200809203004343.png" alt="image-20200809203004343" style="zoom:67%;" />
+  
   - Zoom on network details
 
 <img src="vsphere6.7.homelab.on.kvm.assets/image-20200809203108641.png" alt="image-20200809203108641" style="zoom:67%;" />
@@ -534,3 +535,84 @@ vSphere client:   https://vcenter0.home.lab/ui/app/home
 - Created a datacenter and cluster and assigned esxi12 host
 
 <img src="vsphere6.7.homelab.on.kvm.assets/image-20200809222207556.png" alt="image-20200809222207556" style="zoom:67%;" />
+
+## Adjust the Resources of *esxi11* VM and the nested *vcenter0* VM after vCenter Installation
+
+We used 17G RAM in the esxi11 VM since the vCenter installation requires 16G.
+
+Considering the limited resources of the lab (total 32GRAM) we try to bring down the resources used by this vm.  We also need to modify the (nested) vcenter0 VM inside esxi11.
+
+**Note**: this action is probably unsupported and is performed in the context of a lab not performing any critical functions.
+
+1. Stop vCenter using the vCenter Appliance Management Interface (https://vcenter0.home.lab:5480)
+
+   - Actions - Shutdown
+
+2. Power of the vcenter0 VM in esxi11 using the esxi11 host GUI management interface https://esxi11.home.lab/ui/#/host/vms
+
+   - Select VM - power off
+
+3. In the same esxi11 GUI manager,  modify the settings of the vcenter0 VM 
+
+   - (select VM / actions / edit settings) 
+     - CPU : 6 (attempt to give it more power)
+     - Memory : initial test setting to  8000MB  decrease from 16G -- intent is to run lab with 3 ESXi hosts (KVM vms) - 1 for vCenter and 2 for other tests)
+   - Note all the warnings related to this VM being managed by vCenter.  
+     - (TODO : verify if we should disconnect host esxi11 from vCenter before attempting the changes)
+
+   ![image-20200810065958831](vsphere6.7.homelab.on.kvm.assets/image-20200810065958831.png)
+
+4. In the same esxi11 GUI manager shut down the esxi11 host itself
+
+   - Select host -  actions - enter maintenance mode
+   - Select host - actions - shut down
+
+5. verify at KVM level that esxi11 vm is not powered on  (use virt-manager GUI or virsh)
+
+   ```
+   $ virsh dominfo esxi11
+   Id:             -
+   Name:           esxi11
+   UUID:           ad8a6c45-219c-4745-b74f-26aedcbfe088
+   OS Type:        hvm
+   State:          shut off
+   (...)
+   
+   ```
+
+6. Using virt-manager, we modify the parameters of VM esxi11
+
+- CPUs - from 4 to 6   (attempt to give it more power)
+- RAM - from 17G to 10G   (attempt to accommodate the vcenter0 requirement of 8G set above)
+
+7. Verify settings (6 CPU, 10G RAM) with virsh and restart esxi11 VM  (could also use virt-manager)
+
+```
+$ virsh dominfo esxi11
+Id:             -
+Name:           esxi11
+UUID:           ad8a6c45-219c-4745-b74f-26aedcbfe088
+OS Type:        hvm
+State:          shut off
+CPU(s):         6
+Max memory:     10240000 KiB
+Used memory:    10240000 KiB
+Persistent:     yes
+Autostart:      disable
+Managed save:   no
+Security model: apparmor
+Security DOI:   0
+
+$ virsh start esxi11
+```
+
+
+
+8. Connect to esxi11 using the GUI interface.  
+
+   - Exit maintenance mode (Host / actions / exit maintenance mode)
+   - Power on vcenter0 VM (Virtual Machines / vcenter0  / Power on)
+
+9. Connect to vcenter appliance management interface and verify status
+
+   
