@@ -156,6 +156,10 @@ Running hypervisor: QEMU 4.2.0
     </host>    <host ip='192.168.122.112'>
       <hostname>esxi12.home.lab</hostname>
     </host>
+    <host ip='192.168.122.123'>
+      <hostname>esxi23.home.lab</hostname>
+    </host>
+
   </dns>
   <ip address='192.168.122.1' netmask='255.255.255.0'>
     <dhcp>
@@ -214,6 +218,8 @@ Running hypervisor: QEMU 4.2.0
   192.168.122.110 vcenter0 vcenter0.home.lab
   192.168.122.111 esxi11 esxi21.home.lab
   192.168.122.112 esxi12 esxi12.home.lab
+  192.168.122.113 esxi13 esxi13.home.lab
+  
   
   (...)
   ```
@@ -332,16 +338,18 @@ Running hypervisor: QEMU 4.2.0
 
   If the command succeeds,  KVM will launch the *esxi21* VM and it will boot from the installer ISO.
 
-  The installation progress can be followed in the console opening the VM in *virt-mgr* or using the *virt-viewer* utility
+  The installation progress can be followed in the console opening the VM in *virt-mgr* or using the *virt-viewer* utility.    
 
+  - Note: Use the  key combination "ctrl-leftAlt" to release the mouse from virt-viewer or the console in virt-manager.
+  
   ```
-  $ virt-viewer esxi11 &
+$ virt-viewer esxi11 &
   ```
 
   ### ESXi Installation  
 
   Follow the installation instructions  (keyboard, root password, disk, etc..) 
-
+  
   When the installation ends a reboot will be requested.   In this case the VM will  in fact shutdown and will have to be restarted manually  (```virsh start esxi11```) and reconnect to console with virt-viewer (```virt-viewer esxi11 &```)
 
 ### ESXi Host Configuration and Testing
@@ -536,13 +544,32 @@ vSphere client:   https://vcenter0.home.lab/ui/app/home
 
 <img src="vsphere6.7.homelab.on.kvm.assets/image-20200809222207556.png" alt="image-20200809222207556" style="zoom:67%;" />
 
-## Adjust the Resources of *esxi11* VM and the nested *vcenter0* VM after vCenter Installation
+### Adjust the Resources of *esxi11* VM and the nested *vcenter0* VM after vCenter Installation
 
 We used 17G RAM in the esxi11 VM since the vCenter installation requires 16G.
 
 Considering the limited resources of the lab (total 32GRAM) we try to bring down the resources used by this vm.  We also need to modify the (nested) vcenter0 VM inside esxi11.
 
 **Note**: this action is probably unsupported and is performed in the context of a lab not performing any critical functions.
+
+The first attempt involved assigning 10GB RAM to the esxi11 and 8GB RAM to the nested vmware0 VM.
+
+Note: soon after performing the changes (10GB to esxi11,  8GB to vcenter0),  vCenter complained of memory exhaustion (through VCSA interface and vSphere interface)
+
+<img src="vsphere6.7.homelab.on.kvm.assets/image-20200810093802119.png" alt="image-20200810093802119" style="zoom:50%;" />
+
+The second attempt involved 11GB RAM to esxi11 and 10GB RAM to vcenter0
+
+A similar warning was generated at 9:47 am after increasing the memory.   Monitoring the CPU and Memory in the vCenter management GUI yields memory utilization close to 90%
+
+<img src="vsphere6.7.homelab.on.kvm.assets/image-20200810095530084.png" alt="image-20200810095530084" style="zoom:67%;" />
+
+Monitoring the vcenter0 VM in esxi11 host GUI yields the following curve.
+
+- Memory utilization averaging 6.96GB with a peak of 9.03GB for a very idle vCenter.
+- Note that ESXi only records one hour of data (for longer intervals one must use vSphere client)
+
+<img src="vsphere6.7.homelab.on.kvm.assets/image-20200810100123637.png" alt="image-20200810100123637" style="zoom:67%;" />
 
 1. Stop vCenter using the vCenter Appliance Management Interface (https://vcenter0.home.lab:5480)
 
@@ -556,7 +583,7 @@ Considering the limited resources of the lab (total 32GRAM) we try to bring down
 
    - (select VM / actions / edit settings) 
      - CPU : 6 (attempt to give it more power)
-     - Memory : initial test setting to  8000MB  decrease from 16G -- intent is to run lab with 3 ESXi hosts (KVM vms) - 1 for vCenter and 2 for other tests)
+     - Memory : initial test setting to  8000MB  decrease from 16G -- intent is to run lab with 3 ESXi hosts (KVM vms) - 1 for vCenter  VM and little else,  and 2 ESXi for assorted VM tests)
    - Note all the warnings related to this VM being managed by vCenter.  
      - (TODO : verify if we should disconnect host esxi11 from vCenter before attempting the changes)
 
@@ -612,7 +639,58 @@ $ virsh start esxi11
 
    - Exit maintenance mode (Host / actions / exit maintenance mode)
    - Power on vcenter0 VM (Virtual Machines / vcenter0  / Power on)
-
 9. Connect to vcenter appliance management interface and verify status
 
-   
+
+
+## Launch additional ESXi host as KVM VM
+
+
+
+will launch esxi12 (192.168.122.112) 
+
+- parameters:   4 CPUs,  8GB RAM,  30GB Hard Disk
+
+Once fully configured we will clone it with KVM (also exploring other options) to esxi13 (.113)
+
+*virt-install* command
+
+```bash
+$ virt-install --virt-type=kvm --name=esxi12 --ram 8000 --vcpus=4 --virt-type=kvm --hvm --cdrom /vms/isos/vSphere_6.7/VMware.vSphere.Hypervisor.ESXi.6.7U3b.x86_64.iso --network network:default,model=vmxnet3 --network network:priv1,model=vmxnet3 --network network:priv2,model=vmxnet3 --graphics vnc --video qxl --disk pool=default,size=40,sparse=true,bus=ide,format=qcow2 --boot cdrom,hd --noautoconsole --force --cpu host
+```
+
+The installation progress can be followed in the console opening the VM in *virt-mgr* or using the *virt-viewer* utility
+
+```
+$ virt-viewer esxi11 &
+```
+
+When the ESXi installer ends and requests a reboot, press enter.  The VM needs to be restarted at KVM level
+
+```bash
+$ virsh start esxi12
+Domain esxi12 started
+
+$ virsh dominfo esxi12
+Id:             6
+Name:           esxi12
+UUID:           f5c302b9-d4e9-471b-a99c-984380ea314e
+OS Type:        hvm
+State:          running
+CPU(s):         4
+CPU time:       93.0s
+Max memory:     8192000 KiB
+Used memory:    8192000 KiB
+Persistent:     yes
+Autostart:      disable
+Managed save:   no
+Security model: apparmor
+Security DOI:   0
+Security label: libvirt-f5c302b9-d4e9-471b-a99c-984380ea314e (enforcing)
+
+```
+
+Modify networking (IP: 192.168.122.112, DNS, hostname, disable IPv6, etc...) and troubleshoting (enable SSH, esxcli) as for esxi11
+
+
+
