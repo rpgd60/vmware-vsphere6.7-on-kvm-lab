@@ -9,7 +9,7 @@ A similar lab using vSphere 7.0 is documented in a [separate github repository](
 
 The diagram below summarizes the deployment
 
-<img src="README.assets/Deployment diagram vSphere 6.7.png" style="zoom:75%;" />
+![Deployment Diagram vSphere 6.7](README.assets/deployment.diagram.vsSphere.6.7-1597034526809.png)
 
 **Motivation**:  Deploying a vSphere nested environment in KVM is admittedly not very practical.   Most people would recommend using ESXi as the base hypervisor for these experiments.   
 
