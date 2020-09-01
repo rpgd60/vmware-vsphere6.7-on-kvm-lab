@@ -645,13 +645,13 @@ $ virsh start esxi11
 
 ## Launch additional ESXi host as KVM VM
 
-
+### Launch VM for esxi12 host
 
 will launch esxi12 (192.168.122.112) 
 
 - parameters:   4 CPUs,  8GB RAM,  30GB Hard Disk
 
-Once fully configured we will clone it with KVM (also exploring other options) to esxi13 (.113)
+
 
 *virt-install* command
 
@@ -692,7 +692,15 @@ Security label: libvirt-f5c302b9-d4e9-471b-a99c-984380ea314e (enforcing)
 
 Modify networking (IP: 192.168.122.112, DNS, hostname, disable IPv6, etc...) and troubleshoting (enable SSH, esxcli) as for esxi11
 
+
+
+### Add esxi12 host to vCenter
+
+#### Problem adding host
+
 **PROBLEM**:  Installation of host esxi12 proceeds OK,  but adding this host to vcenter inventory fails.   The task always gets stuck at 80%.  Ongoing investigation but so far no success.
+
+Reproducing problem:
 
 - Using vSphere Client -  select "DC Home Lab" and "Add Host"
 - Enter host information (verified that esxi12.home.lab is in DNS and reachable from vcenter0 VM)
@@ -727,5 +735,101 @@ Modify networking (IP: 192.168.122.112, DNS, hostname, disable IPv6, etc...) and
 
 ![image-20200901085805982](vsphere6.7.homelab.on.kvm.assets/image-20200901085805982.png)
 
-- After some minutes an error is reported for the task
+- After some minutes an details are reported for the task
+
+![image-20200901090326882](vsphere6.7.homelab.on.kvm.assets/image-20200901090326882.png)
+
+- and eventually an error is reported:  "An error occured when communicating with the remote host" with Details "Retrieving data from vCenter agent on ..."
+
+  
+
+![image-20200901091529155](vsphere6.7.homelab.on.kvm.assets/image-20200901091529155.png)
+
+
+
+#### Troubleshooting
+
+##### Connectivity 
+
+- connected with SSH to vcenter0 (192.168.122.110)
+- can ping new host (esxi12) with IP (192.168.122.112), hostname (esxi12) and FQDN (esxi12.home.lab)
+- can ping with large packets e.g. (ping -s 2000)
+
+##### NTP
+
+- Both vcenter0 and esxi12 have  NTP enabled (synched to pool.ntp.org)
+  - esxi12   ntpq -p command reports synch status OK (see "*")
+
+```bash
+​```
+[root@esxi12:~] ntpq -p
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+*ntp.redimadrid. 193.147.107.33   2 u   41   64  377    6.601   16.316  29.432
+```
+
+- ​	vcenter0 reports no actual peer
+
+```
+root@vcenter0 [ ~ ]# ntpq -p
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+ ntp9.kashra-ser 192.168.100.15   2 u   70  256   77   27.721   -3.262  12.636
+```
+
+Double check NTP config for VM vcenter0 in ESXi host esxi11
+
+Restarted ntp server in vcenter0  (systemctl restart ntpd)
+
+Verified that now an NTP server is available (note from tcpdump capture that NTP traffic between vmware0 and NTP server in Internet is successful)
+
+Note that in the first 'ntpq -p' command there is no synchronization but eventually it is achieved (second ntpq -p command)
+
+```
+root@vcenter0 [ ~ ]# ntpq -p
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+ time.cloudflare 10.40.9.80       3 u   48   64    3    6.668   -0.738   0.220
+ 
+root@vcenter0 [ ~ ]# tcpdump port 123
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+09:35:29.441621 IP vcenter0.home.lab.ntp > time.cloudflare.com.ntp: NTPv4, Client
+09:35:29.449376 IP time.cloudflare.com.ntp > vcenter0.home.lab.ntp: NTPv4, Server
+09:36:33.442948 IP vcenter0.home.lab.ntp > time.cloudflare.com.ntp: NTPv4, Client
+(...)
+
+root@vcenter0 [ ~ ]# ntpq -p
+     remote           refid      st t when poll reach   delay   offset  jitter
+==============================================================================
+*time.cloudflare 10.40.9.80       3 u   23   64  177    6.668   -0.738   0.355
+
+```
+
+- Attempt to add host esxi12 to vcenter again -   same problem 
+
+##### sniffing connectivity (tcpdump in vcenter0)
+
+Tried sniffing the connectivity from vcenter0 where tcpdump is available
+
+There appear to be many tcp packets with [R] (reset) flag from esxi12 to vcenter0. Most of these appear to be related to SSL (port 443) -  TODO: explore certificates.
+
+```
+09:44:20.748592 IP esxi12.home.lab.https > vcenter0.home.lab.48538: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:20.748740 IP esxi12.home.lab.https > vcenter0.home.lab.48536: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:22.211726 IP vcenter0.home.lab.48602 > esxi12.home.lab.https: Flags [P.], seq 200:400, ack 323, win 174, length 200
+09:44:22.214178 IP esxi12.home.lab.https > vcenter0.home.lab.48602: Flags [P.], seq 323:645, ack 400, win 128, length 322
+09:44:22.214311 IP vcenter0.home.lab.48602 > esxi12.home.lab.https: Flags [.], ack 645, win 186, length 0
+09:44:22.908548 IP esxi12.home.lab.https > vcenter0.home.lab.48602: Flags [P.], seq 323:645, ack 400, win 128, length 322
+09:44:22.908578 IP vcenter0.home.lab.48602 > esxi12.home.lab.https: Flags [.], ack 645, win 186, options [nop,nop,sack 1 {323:645}], length 0
+09:44:25.758724 IP esxi12.home.lab.https > vcenter0.home.lab.48558: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:25.758873 IP esxi12.home.lab.https > vcenter0.home.lab.com-bardac-dw: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:29.058808 IP esxi12.home.lab.https > vcenter0.home.lab.48570: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:29.058902 IP esxi12.home.lab.https > vcenter0.home.lab.48576: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:29.308743 IP esxi12.home.lab.https > vcenter0.home.lab.48604: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:30.748842 IP esxi12.home.lab.https > vcenter0.home.lab.48598: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:30.748844 IP esxi12.home.lab.https > vcenter0.home.lab.48580: Flags [R.], seq 1, ack 1, win 128, length 0
+09:44:30.748846 IP esxi12.home.lab.https > vcenter0.home.lab.48600: Flags [R.], seq 1, ack 1, win 128, length 0
+
+```
 
