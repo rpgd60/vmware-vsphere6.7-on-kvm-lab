@@ -540,7 +540,7 @@ This iso, when mounted, provides access to Windows and Linux CLI and GUI install
 vSphere client:   https://vcenter0.home.lab/ui/app/home
 
 - (administrator@vsphere.local)
-- Created a datacenter and cluster and assigned esxi12 host
+- Created a datacenter and cluster and assigned esxi11 host
 
 <img src="vsphere6.7.homelab.on.kvm.assets/image-20200809222207556.png" alt="image-20200809222207556" style="zoom:67%;" />
 
@@ -691,6 +691,8 @@ Security label: libvirt-f5c302b9-d4e9-471b-a99c-984380ea314e (enforcing)
 ```
 
 Modify networking (IP: 192.168.122.112, DNS, hostname, disable IPv6, etc...) and troubleshoting (enable SSH, esxcli) as for esxi11
+
+**PROBLEM**:  Installation of host esxi12 proceeds OK,  but adding this host to vcenter inventory fails.   The task always gets stuck at 80%.  Ongoing investigation but so far no success.
 
 
 
