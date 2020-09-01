@@ -694,5 +694,38 @@ Modify networking (IP: 192.168.122.112, DNS, hostname, disable IPv6, etc...) and
 
 **PROBLEM**:  Installation of host esxi12 proceeds OK,  but adding this host to vcenter inventory fails.   The task always gets stuck at 80%.  Ongoing investigation but so far no success.
 
+- Using vSphere Client -  select "DC Home Lab" and "Add Host"
+- Enter host information (verified that esxi12.home.lab is in DNS and reachable from vcenter0 VM)
 
+![image-20200901084737553](vsphere6.7.homelab.on.kvm.assets/image-20200901084737553.png)
+
+- Enter the ESXi host credentials for new host (esxi12)
+
+![image-20200901084933328](vsphere6.7.homelab.on.kvm.assets/image-20200901084933328.png)
+
+- vCenter seems to be able to connect to esxi12 and retrieve basic info
+
+![image-20200901085038041](vsphere6.7.homelab.on.kvm.assets/image-20200901085038041.png)
+
+- Assign evaluation license
+
+![image-20200901085133153](vsphere6.7.homelab.on.kvm.assets/image-20200901085133153.png)
+
+- Lockdown mode - keep suggested (disabled)
+
+![image-20200901085241285](vsphere6.7.homelab.on.kvm.assets/image-20200901085241285.png)
+
+- VM Location 
+
+![image-20200901085341233](vsphere6.7.homelab.on.kvm.assets/image-20200901085341233.png)
+
+- Ready to Complete
+
+![image-20200901085444093](vsphere6.7.homelab.on.kvm.assets/image-20200901085444093.png)
+
+- After clicking "Finish" the task begins and is reported in the main vSphere client screen.  The task appears to be 80% complete, but remains so indefinitely.
+
+![image-20200901085805982](vsphere6.7.homelab.on.kvm.assets/image-20200901085805982.png)
+
+- After some minutes an error is reported for the task
 
